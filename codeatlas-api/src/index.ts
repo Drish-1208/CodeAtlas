@@ -28,16 +28,45 @@ app.post('/api/ingest', async (req: Request, res: Response) => {
   }
   
   try {
+    console.log(`Starting analysis for: ${repoUrl}`);
+    
+    // 1. Clone the repository
     const repoPath = await cloneRepository(repoUrl);
+    
+    // 2. Scan the cloned directory for all valid source files
+    const sourceFiles = getAllSourceFiles(repoPath);
+    console.log(`Found ${sourceFiles.length} files to analyze.`);
+    
+    // 3. Create the dependency map
+    // This object will look like: { "src/App.tsx": ["react", "./components/Button"] }
+    const dependencyMap: Record<string, string[]> = {};
+    
+    // 4. Parse every file
+    for (const filePath of sourceFiles) {
+      try {
+        const imports = parseFileImports(filePath);
+        
+        // To make the map readable, we remove the long absolute system paths 
+        // and just keep the relative path starting from the repository folder
+        const relativePath = filePath.replace(repoPath, '');
+        dependencyMap[relativePath] = imports;
+        
+      } catch (parseError) {
+        // If one file is malformed, we log it but don't crash the whole process
+        console.error(`Failed to parse file ${filePath}:`, parseError);
+      }
+    }
+    
     res.status(200).json({ 
-      message: 'Repository cloned successfully', 
-      path: repoPath 
+      message: 'Repository analyzed successfully', 
+      totalFiles: sourceFiles.length,
+      dependencies: dependencyMap 
     });
   } catch (error) {
-    console.error('Clone failed:', error);
-    res.status(500).json({ error: 'Failed to clone repository' });
+    console.error('Ingestion failed:', error);
+    res.status(500).json({ error: 'Failed to ingest and analyze repository' });
   }
-});;
+});
 
 // Temporary Test Route for File Scanner
 app.get('/api/test-scanner', (req: Request, res: Response) => {

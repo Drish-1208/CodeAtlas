@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { cloneRepository } from './gitService';
 import { parseFileImports } from './parserService';
 import * as path from 'path';
+import { getAllSourceFiles } from './fileScanner';
 dotenv.config();
 
 const app = express();
@@ -38,22 +39,22 @@ app.post('/api/ingest', async (req: Request, res: Response) => {
   }
 });;
 
-// Temporary Test Route for Tree-sitter
-app.get('/api/test-parser', (req: Request, res: Response) => {
+// Temporary Test Route for File Scanner
+app.get('/api/test-scanner', (req: Request, res: Response) => {
   try {
-    // We will tell Tree-sitter to parse this exact file (index.ts)
-    const filePath = path.join(process.cwd(), 'src', 'index.ts');
+    // Point the scanner at our own src directory
+    const targetDirectory = path.join(process.cwd(), 'src');
     
-    const imports = parseFileImports(filePath);
+    const sourceFiles = getAllSourceFiles(targetDirectory);
     
     res.status(200).json({
-      message: 'Tree-sitter successfully parsed the file!',
-      file: 'src/index.ts',
-      extractedImports: imports
+      message: 'Directory successfully scanned!',
+      totalFilesFound: sourceFiles.length,
+      files: sourceFiles
     });
   } catch (error) {
-    console.error('Parsing failed:', error);
-    res.status(500).json({ error: 'Failed to parse file' });
+    console.error('Scanning failed:', error);
+    res.status(500).json({ error: 'Failed to scan directory' });
   }
 });
 

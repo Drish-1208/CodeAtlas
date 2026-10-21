@@ -2,7 +2,8 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { cloneRepository } from './gitService';
-
+import { parseFileImports } from './parserService';
+import * as path from 'path';
 dotenv.config();
 
 const app = express();
@@ -36,6 +37,25 @@ app.post('/api/ingest', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to clone repository' });
   }
 });;
+
+// Temporary Test Route for Tree-sitter
+app.get('/api/test-parser', (req: Request, res: Response) => {
+  try {
+    // We will tell Tree-sitter to parse this exact file (index.ts)
+    const filePath = path.join(process.cwd(), 'src', 'index.ts');
+    
+    const imports = parseFileImports(filePath);
+    
+    res.status(200).json({
+      message: 'Tree-sitter successfully parsed the file!',
+      file: 'src/index.ts',
+      extractedImports: imports
+    });
+  } catch (error) {
+    console.error('Parsing failed:', error);
+    res.status(500).json({ error: 'Failed to parse file' });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

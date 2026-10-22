@@ -57,15 +57,21 @@ export default function DependencyGraph({ data }: DependencyGraphProps) {
       imports.forEach(target => uniqueNodes.add(target));
     });
 
-    Array.from(uniqueNodes).forEach((nodeId) => {
+   Array.from(uniqueNodes).forEach((nodeId) => {
+      // A simple check: if the name has slashes or dots, it's likely an internal file. 
+      // If it's just a single word (like 'express' or 'react'), it's an external package.
+      const isExternal = !nodeId.includes('/') && !nodeId.includes('\\') && !nodeId.startsWith('.');
+
       generatedNodes.push({
         id: nodeId,
-        position: { x: 0, y: 0 }, // Dagre will overwrite this coordinate
+        position: { x: 0, y: 0 },
         data: { label: nodeId },
         style: { 
           background: '#1e1e1e', 
-          color: '#4ade80', 
-          border: '1px solid #333',
+          // Green text for internal files, gray text for external packages
+          color: isExternal ? '#a1a1aa' : '#4ade80', 
+          // Blue border for internal files, dark gray for external
+          border: isExternal ? '1px solid #3f3f46' : '1px solid #3b82f6',
           borderRadius: '6px',
           padding: '10px',
           fontSize: '12px',

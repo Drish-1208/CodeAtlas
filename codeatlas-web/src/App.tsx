@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import DependencyGraph from './DependencyGraph';
 import './App.css';
 
 function App() {
@@ -49,12 +50,13 @@ function App() {
         </button>
       </form>
 
-      {result && (
-        <div style={{ marginTop: '20px', textAlign: 'left', backgroundColor: '#1e1e1e', padding: '15px', borderRadius: '8px' }}>
-          <h3 style={{ color: '#fff' }}>Raw Dependency Map:</h3>
-          <pre style={{ color: '#00ff00', overflowX: 'auto' }}>
-            {JSON.stringify(result, null, 2)}
-          </pre>
+      {result && result.dependencies && (
+        <DependencyGraph data={result.dependencies} />
+      )}
+      
+      {result && result.error && (
+        <div style={{ color: 'red', marginTop: '20px' }}>
+          Error: {result.error}
         </div>
       )}
     </div>

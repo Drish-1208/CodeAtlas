@@ -1,30 +1,66 @@
 import { useMemo } from 'react';
 import { ReactFlow, Background, Controls } from 'reactflow';
-import type { Node, Edge } from 'reactflow';import 'reactflow/dist/style.css';
+import type { Node, Edge } from 'reactflow';
+import dagre from 'dagre';
+import 'reactflow/dist/style.css';
 
 interface DependencyGraphProps {
   data: Record<string, string[]>;
 }
 
+// 1. Initialize the Dagre graph engine
+const dagreGraph = new dagre.graphlib.Graph();
+dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+// 2. A utility function that calculates exactly where every node should go
+const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => {
+  // TB = Top to Bottom layout
+  dagreGraph.setGraph({ rankdir: direction });
+
+  // Tell Dagre how big our boxes are so it can space them correctly
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: 250, height: 50 });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  // Run the complex layout math
+  dagre.layout(dagreGraph);
+
+  // Apply the calculated X/Y coordinates back to our React Flow nodes
+  nodes.forEach((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    node.targetPosition = 'top' as any;
+    node.sourcePosition = 'bottom' as any;
+    
+    // Dagre uses the center of the node, React Flow uses the top-left, so we offset it
+    node.position = {
+      x: nodeWithPosition.x - 250 / 2,
+      y: nodeWithPosition.y - 50 / 2,
+    };
+    return node;
+  });
+
+  return { nodes, edges };
+};
+
 export default function DependencyGraph({ data }: DependencyGraphProps) {
-  // useMemo ensures we only recalculate the math when the data actually changes
   const { nodes, edges } = useMemo(() => {
     const generatedNodes: Node[] = [];
     const generatedEdges: Edge[] = [];
     const uniqueNodes = new Set<string>();
 
-    // 1. Identify every unique file and imported package
     Object.entries(data).forEach(([source, imports]) => {
       uniqueNodes.add(source);
       imports.forEach(target => uniqueNodes.add(target));
     });
 
-    // 2. Create the Nodes and arrange them in a basic grid
-    Array.from(uniqueNodes).forEach((nodeId, index) => {
+    Array.from(uniqueNodes).forEach((nodeId) => {
       generatedNodes.push({
         id: nodeId,
-        // Math for a simple grid: 4 items per row, spaced 250px apart horizontally and 150px vertically
-        position: { x: (index % 4) * 250, y: Math.floor(index / 4) * 150 },
+        position: { x: 0, y: 0 }, // Dagre will overwrite this coordinate
         data: { label: nodeId },
         style: { 
           background: '#1e1e1e', 
@@ -33,12 +69,12 @@ export default function DependencyGraph({ data }: DependencyGraphProps) {
           borderRadius: '6px',
           padding: '10px',
           fontSize: '12px',
-          fontFamily: 'monospace'
+          fontFamily: 'monospace',
+          width: 250
         }
       });
     });
 
-    // 3. Create the Edges (connecting lines)
     Object.entries(data).forEach(([source, imports]) => {
       imports.forEach(target => {
         generatedEdges.push({
@@ -51,7 +87,8 @@ export default function DependencyGraph({ data }: DependencyGraphProps) {
       });
     });
 
-    return { nodes: generatedNodes, edges: generatedEdges };
+    // 3. Pass our raw nodes and edges into the Dagre engine before returning them
+    return getLayoutedElements(generatedNodes, generatedEdges);
   }, [data]);
 
   return (

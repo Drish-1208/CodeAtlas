@@ -5,6 +5,7 @@ import { cloneRepository } from './gitService';
 import { parseFileImports } from './parserService';
 import * as path from 'path';
 import { getAllSourceFiles } from './fileScanner';
+import { resolveImportPath } from './pathResolver';
 dotenv.config();
 
 const app = express();
@@ -44,12 +45,21 @@ app.post('/api/ingest', async (req: Request, res: Response) => {
     // 4. Parse every file
     for (const filePath of sourceFiles) {
       try {
-        const imports = parseFileImports(filePath);
+        const rawImports = parseFileImports(filePath);
         
-        // To make the map readable, we remove the long absolute system paths 
-        // and just keep the relative path starting from the repository folder
+        // Resolve the relative imports to their actual file paths
+        const resolvedImports = rawImports.map(imp => 
+          resolveImportPath(filePath, imp, sourceFiles)
+        );
+        
         const relativePath = filePath.replace(repoPath, '');
-        dependencyMap[relativePath] = imports;
+        
+        // Ensure the resolved imports are also formatted as relative paths for the frontend
+        const finalImports = resolvedImports.map(imp => 
+          imp.startsWith(repoPath) ? imp.replace(repoPath, '') : imp
+        );
+        
+        dependencyMap[relativePath] = finalImports;
         
       } catch (parseError) {
         // If one file is malformed, we log it but don't crash the whole process

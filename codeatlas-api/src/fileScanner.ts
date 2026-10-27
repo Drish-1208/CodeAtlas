@@ -3,7 +3,7 @@ import path from 'path';
 
 // We do not want to parse compiled code or third-party libraries
 const IGNORE_DIRS = new Set(['node_modules', 'dist', 'build', '.git', '.next']);
-const VALID_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
+const VALID_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.py', '.cpp', '.hpp', '.c', '.h']);
 
 export function getAllSourceFiles(dirPath: string, arrayOfFiles: string[] = []): string[] {
   const files = fs.readdirSync(dirPath);

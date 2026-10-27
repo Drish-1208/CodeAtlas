@@ -1,41 +1,57 @@
 import Parser from 'tree-sitter';
-// @ts-ignore - tree-sitter-typescript does not ship with official type definitions yet
 import tsLanguage from 'tree-sitter-typescript';
 import fs from 'fs';
+import path from 'path';
+
+const parser = new Parser();
 
 export function parseFileImports(filePath: string): string[] {
-  // 1. Initialize the parser and set it to read TypeScript
-  const parser = new Parser();
-  parser.setLanguage(tsLanguage.typescript);
-
-  // 2. Read the raw text of the file
-  const sourceCode = fs.readFileSync(filePath, 'utf8');
-
-  // 3. Generate the Abstract Syntax Tree (AST)
-  const tree = parser.parse(sourceCode);
-
+  const ext = path.extname(filePath);
+  const code = fs.readFileSync(filePath, 'utf-8');
   const imports: string[] = [];
 
-  // 4. A recursive function to walk through every node in the tree
-  function walkNode(node: Parser.SyntaxNode) {
-    // If the node is an import statement, find the module it is importing
-    if (node.type === 'import_statement') {
-      // Look for the string literal (e.g., 'express' in import ... from 'express')
-      const sourceNode = node.children.find(child => child.type === 'string');
-      if (sourceNode) {
-        // Remove the quotes around the string and save it
-        imports.push(sourceNode.text.replace(/['"]/g, ''));
+  try {
+    if (['.ts', '.tsx', '.js', '.jsx'].includes(ext)) {
+      // TypeScript/JavaScript still uses Tree-sitter for accuracy
+      parser.setLanguage(tsLanguage.tsx);
+      const tree = parser.parse(code);
+      extractTSImports(tree.rootNode, imports);
+    } 
+    else if (ext === '.py') {
+      // Pure Regex fallback for Python
+      const fromRegex = /^from\s+([a-zA-Z0-9_.]+)/gm;
+      const importRegex = /^import\s+([a-zA-Z0-9_.,\s]+)/gm;
+      
+      let match;
+      while ((match = fromRegex.exec(code)) !== null) {
+        imports.push(match[1]);
+      }
+      while ((match = importRegex.exec(code)) !== null) {
+        const modules = match[1].split(',').map(m => m.trim().split(/\s+/)[0]);
+        imports.push(...modules);
+      }
+    } 
+    else if (['.cpp', '.hpp', '.c', '.h'].includes(ext)) {
+      // Pure Regex fallback for C/C++
+      const includeRegex = /^#include\s+[<"]([^>"]+)[>"]/gm;
+      let match;
+      while ((match = includeRegex.exec(code)) !== null) {
+        imports.push(match[1]);
       }
     }
-
-    // Keep walking down the tree
-    for (const child of node.children) {
-      walkNode(child);
-    }
+  } catch (error) {
+    console.error(`Failed to parse ${filePath}:`, error);
   }
 
-  // Start the walk from the very top (root) of the document
-  walkNode(tree.rootNode);
+  return Array.from(new Set(imports)); // Deduplicate
+}
 
-  return imports;
+// TS extraction helper
+function extractTSImports(node: any, imports: string[]) {
+  if (!node) return;
+  if (node.type === 'import_statement') {
+    const sourceNode = node.children.find((c: any) => c.type === 'string');
+    if (sourceNode) imports.push(sourceNode.text.replace(/['"]/g, ''));
+  }
+  for (const child of node.children || []) extractTSImports(child, imports);
 }
